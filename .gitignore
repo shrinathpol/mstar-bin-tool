@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.bin
+*.elf
+unpacked_fw/
+unpacked_hisi/
