@@ -4,3 +4,7 @@ __pycache__/
 *.elf
 unpacked_fw/
 unpacked_hisi/
+
+aq.ini
+aq.ini.*
+*.bak
