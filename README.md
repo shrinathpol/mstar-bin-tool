@@ -1,77 +1,65 @@
-# mstar-bin-tool
+# HiSilicon & MStar TV Firmware Modding Suite
+### Board: `TP.SK508.PB801` | SoC: `Hi3751V350` (Cortex-A53, Android 9 Pie API 28)
 
-Command line tools to pack/unpack MStar bin firmware
+This repository contains tools, reverse-engineered scripts, and utilities for unpacking, modifying, repairing, and re-packing firmware binaries (`allupgrade_V351_sos.bin`) for Smart TVs running on HiSilicon and MStar chipsets.
 
-Currently available tools:
- - **unpack.py** - unpack MStar bin firmware
- - **pack.py** - pack MStar bin firmware
- - **extract_keys.py** - extract AES and RSA-public keys from MBOOT binary
- - **secure_partition.py** - encrypt image and generate signature file
+Repository: **[https://github.com/shrinathpol/mstar-bin-tool](https://github.com/shrinathpol/mstar-bin-tool)**
 
+---
 
-## Unpack MStar bin firmware files
+## 🛠 Included Tools & Utilities
 
-```
-Usage: unpack.py <firmware> <output folder [default: ./unpacked/]>
-        <firmware> - MStar bin firmware to unpack
-        <output folder> - directory to store unpacked stuff. Default value: ./unpacked/
-```
+| Script | Description |
+| :--- | :--- |
+| **`fix_hd_backlight.py`** | Fixes LED backlight flicker by reprogramming OB3350 dimming PWM from 180Hz to 25kHz with correct GPIO `0x1B` and polarity `0x0`. |
+| **`create_fhd_bin.py`** | Automatically builds a 1920×1080 Full HD firmware binary with verified partition CRCs. |
+| **`unpack_hisi.py`** | Fast unpacker for HiSilicon `allupgrade_V351_sos.bin` container files and partition CRC32 verification. |
+| **`patch_all_final.py`** | Comprehensive patcher for remote keycodes (`key.xml`), hotkeys (`hotkey.xml`), RAM manager (`HiRMService`), and country settings. |
+| **`gen_veuwo_logo.py`** | High-definition boot logo generator and injector for Partition 7. |
+| **`install_all_apps.py`** | Batch split-APK installer via ADB (`install-multiple`) for Android TV applications. |
 
+---
 
-## Pack MStar bin firmware 
-```
-Usage: pack.py <config file>
-Example: pack.py configs/letv-x355pro-full.ini
-		<config file> - Configuration file. The config file structure will be described later.
-                        For now you can take a look at configs/letv-x355pro-full.ini
-                        and use it as an example
-```
+## 🔬 Key Technical Discoveries & Fixes
 
+### 1. LED Backlight Flickering Fix (`fix_hd_backlight.py`)
+* **Hardware Architecture:** The `TP.SK508.PB801` combo board utilizes an **OB3350** LED backlight boost driver IC. An analog RC filter on the DIM pin integrates the PWM signal into a steady DC dimming voltage.
+* **The Problem:** Generic 1366×768 panel dumps set the PWM frequency to `180 Hz`, with inverted polarity (`0x3`) on GPIO `0x14`. Because 180 Hz is far too low for the board's filter capacitor, the voltage oscillates, creating visible backlight flickering.
+* **The Solution:** 
+  - PWM Frequency: Set to `25,000 Hz` (25 kHz).
+  - Control Line: Set to GPIO `0x1B`.
+  - Polarity: Set to `0x00`.
+  - Partition 5 CRC recalculation via GF(2) linear CRC32 algorithms.
 
-## Extract keys from MBOOT
-That tool is used to get AES and public RSA keys from the MBOOT. AES keys are needed to encrypt/decrypt 
-boot.img and recovery.img images. aescrypt2 tool is used.
+### 2. Physical Remote Control & Power Button Fix
+* In `/atv/etc/key.xml` and `/vendor/etc/key.xml`:
+  - `0xbb447f00` $\rightarrow$ `KEY_HOME` (physical HOME button returns to Launcher)
+  - `0x1ce37f00` $\rightarrow$ `KEY_TV_INPUT_MEDIA` (physical FILE button opens File Manager)
+  - `0xaa557f00` / `0x19e67f00` $\rightarrow$ `KEY_QUICK_START3` (physical APP button opens "My Apps")
+  - `0x9f607f00` $\rightarrow$ `KEY_QUICK_START1` (YouTube shortcut)
+  - `0x18e77f00` $\rightarrow$ `KEY_QUICK_START6` (Prime Video shortcut)
+  - Power button standby daemon restored in `HiRMService` RAM manager configuration.
 
-```
-Usage: extract_keys.py <path to mboot> [<folder to store keys>] [<key bank offset>] [<key bank size>]
-Defaults:
-          <folder to store keys>        keys
-          <key bank offset>             0x168e00
-          <key bank size>               0x450
-Example: extract_keys.py ./unpacked/MBOOT.img
-Example: extract_keys.py ./unpacked/MBOOT.img ./keys 0x169e00 0x450
-```
+### 3. Exit Button & Source Entrapment Fix
+* Configured `enable_on_back_pressed=1` and `en_input_source_out_of_tv=0` inside `GlobalUI` configuration:
+  - Pressing **EXIT** when in ATV/HDMI source cleanly closes the TV Activity and returns to the Android Home screen.
+  - The Input Source popup displays the "Home / Android" option to navigate out of HDMI/AV.
 
-## Encrypt/Decrypt partition
-You can encrypt/decrypt partition with using *aescrypt2.exe* tool, which is located in bin/win32 folder
+### 4. Package Installer Fix
+* In the stock ROM, `com.android.packageinstaller` was disabled (`enabled=0`).
+* Fix: Re-enabled via `pm enable com.android.packageinstaller` and granted `REQUEST_INSTALL_PACKAGES` to the TV file manager.
 
-Default mstar key is *hex:0007FF4154534D92FC55AA0FFF0110E0* All mstar default keys are in default_keys folder. (These keys are in public access in github)
+---
 
-Last parameter can be hex value or path to AES key. If your vendor is using custom aes keys you can use extract_keys.py to extract them.
+## 🚀 How to Use
 
-To encrypt image use:
-```
-aescrypt2 0 boot.img boot.img.aes hex:0007FF4154534D92FC55AA0FFF0110E0
-or
-aescrypt2 0 boot.img boot.img.aes keys/AESBootKey
-```
+### Verify and Flash Firmware
+1. Copy `allupgrade_V351_sos.bin` to the root of a FAT32-formatted USB pendrive.
+2. Insert into the TV's USB port while unplugged.
+3. Power on the TV. The front standby LED will blink rapidly for ~2 minutes while partitions are written.
+4. The TV will automatically reboot into Android.
 
-So to decrypt image use:
-```
-aescrypt2 1 boot.img.aes boot.img hex:0007FF4154534D92FC55AA0FFF0110E0
-or
-aescrypt2 1 boot.img boot.img.aes keys/AESBootKey
-```
+---
 
-## Encrypt partition and generate signature
-All new MStar builds have SECURE_BOOT option enabled. In that case 
-boot.img and recovery.img is encrypted (AES) and signed with RSA priv keys.
-That script is used to encrypt image and generate sign file. 
-
-To manually encrypt|decrypt image use aescrypt2 tool from bin folder.
-AES key can be extracted from MBOOT with extract_keys.py script.
-
-```
-Usage: secure_partition.py <file to encrypt> <AES key file> <RSA private key file> <RSA public key file> <output encrypted file> <output signature file>
-Example: secure_partition.py ./pack/boot.img ./keys/AESbootKey ./keys/RSAboot_priv.txt ./keys/RSAboot_pub.txt ./pack/boot.img.aes ./pack/bootSign
-```
+## 👤 Author
+Developed and maintained by **[Shrinath Pol](https://github.com/shrinathpol)**.
