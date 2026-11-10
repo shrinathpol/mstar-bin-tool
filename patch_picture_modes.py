@@ -53,3 +53,4 @@ if __name__ == "__main__":
         sys.exit(1)
     patch_cfg(sys.argv[1])
     patch_db(sys.argv[2])
+
