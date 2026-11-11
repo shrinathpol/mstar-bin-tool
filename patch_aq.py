@@ -14,10 +14,6 @@ news = 35, 40, 65, 60, 30, 50, 50, 50, 50, 50;
 4k = 60, 30, 50, 60, 65, 50, 50, 50, 50, 50;
 user = 50, 50, 50, 50, 50, 50, 50, 50, 50, 50;"""
 
-    # Calibrated anti-noise & anti-buzzing curve:
-    # 120Hz at 46 (-1.2dB) stops plastic rattle
-    # 10kHz at 45 (-1.5dB) cuts high-frequency hiss / static
-    # 1500Hz at 52 (+0.6dB) keeps speech intelligible
     new_geq = """standard = 46, 50, 51, 48, 45, 50, 50, 50, 50, 50;
 movie = 46, 50, 52, 48, 45, 50, 50, 50, 50, 50;
 music = 46, 50, 50, 48, 45, 50, 50, 50, 50, 50;
@@ -34,16 +30,16 @@ user = 50, 50, 50, 50, 50, 50, 50, 50, 50, 50;"""
     content = content.replace("woofervolume = 100;", "woofervolume = 0;")
     content = content.replace("superbass = 1;", "superbass = 0;")
 
-    # 3. Patch [audiovolumecurve]
-    old_vol = "speakerVolumeGain = -25.000, -16.000, -13.125, -10.625, -8.500, -6.625,-4.000,-2.000, -0.125, 1.375, 3.250;"
-    new_vol = "speakerVolumeGain = -25.000, -16.000, -13.125, -10.625, -8.500, -6.625, -4.000, -2.000, -1.000, -0.500, 0.000;"
-    if old_vol in content:
-        content = content.replace(old_vol, new_vol)
+    # 3. Patch [audiovolumecurve]:
+    # Smooth logarithmic curve:
+    # Low volumes (1-10) go down to -62 dB .. -38 dB (whisper-quiet, not blasting)
+    # High volume (100) stays at 0.000 dB (no clipping)
+    new_vol = "speakerVolumeGain = -65.000, -38.000, -28.000, -20.000, -15.000, -11.000, -8.000, -5.000, -3.000, -1.500, 0.000;"
+    new_hp = "headPhoneVolumeGain = -65.000, -38.000, -28.000, -20.000, -15.000, -11.000, -8.000, -5.000, -3.000, -1.500, 0.000;"
 
-    old_hp = "headPhoneVolumeGain = -25.000, -16.000, -13.125, -10.625, -8.500, -6.625, -4.000, -2.000, -0.125, 1.375, 3.250;"
-    new_hp = "headPhoneVolumeGain = -25.000, -16.000, -13.125, -10.625, -8.500, -6.625, -4.000, -2.000, -1.000, -0.500, 0.000;"
-    if old_hp in content:
-        content = content.replace(old_hp, new_hp)
+    import re
+    content = re.sub(r'speakerVolumeGain\s*=\s*[^;\n]+;', new_vol, content)
+    content = re.sub(r'headPhoneVolumeGain\s*=\s*[^;\n]+;', new_hp, content)
 
     # 4. Patch [audiosws3d]: Disable SWS3D and its noisy speech expander
     content = content.replace("sws3D = 1, 0;", "sws3D = 0, 0;")
@@ -66,7 +62,7 @@ user = 50, 50, 50, 50, 50, 50, 50, 50, 50, 50;"""
 
     with open('/home/shrinathpol/mstar-bin-tool/aq.ini.patched', 'w', encoding='utf-8') as f:
         f.write(content)
-    print("Successfully patched aq.ini!")
+    print("Successfully patched aq.ini with whisper-quiet low volume curve!")
 
 if __name__ == '__main__':
     patch_aq()
